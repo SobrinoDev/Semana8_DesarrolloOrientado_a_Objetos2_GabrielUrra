@@ -1,4 +1,4 @@
-# Explorando la sobrecarga y sobreescritura 
+# Semana 2 Desarrollo orientado a objetos II
 
 Proyecto formativo en Java que simula el sistema de asignación y estimación de tiempos de
 entrega de **SpeedFast**, una empresa de reparto a domicilio con tres tipos de servicio: comida,
@@ -108,13 +108,3 @@ Asignando repartidor...
 2. Reutiliza el mismo arreglo para llamar a `asignarRepartidor()` y
    `asignarRepartidor(String)` en sus versiones sobrescrita y sobrecargada (semana 1).
 
-## Cómo ejecutar
-
-Desde IntelliJ IDEA basta con abrir el proyecto y ejecutar `Main.java`.
-
-Desde línea de comandos, situado en `src/`:
-
-```bash
-javac -encoding UTF-8 -d out Main.java Gestion_Pedidos/*.java
-java -Dfile.encoding=UTF-8 -cp out Main
-```
