@@ -19,7 +19,7 @@ public class Main {
             System.out.println();
         }
 
-        // Semana 1: sobrecarga y sobreescritura de asignarRepartidor() 
+        // Semana 1: sobrecarga y sobreescritura de asignarRepartidor()
         System.out.println("=== Asignación de repartidores ===\n");
 
         String[] repartidores = {"Juan Pérez", "Camila Soto", "Luis Díaz"};
