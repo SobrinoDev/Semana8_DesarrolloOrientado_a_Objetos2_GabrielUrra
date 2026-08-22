@@ -1,4 +1,4 @@
-# Explorando la sobrecarga y sobreescritura 
+# Semana 2 Desarrollo orientado a objetos II
 
 Proyecto formativo en Java que simula el sistema de asignación y estimación de tiempos de
 entrega de **SpeedFast**, una empresa de reparto a domicilio con tres tipos de servicio: comida,
