@@ -231,15 +231,3 @@ Asignando repartidor...
 → Verificando mochila térmica... OK
 → Pedido asignado a Juan Pérez
 ```
-
-## `Main.java`
-
-`Main` crea un `ControladorDeEnvios` y un pedido de cada tipo, los registra, y simula el flujo
-completo del sistema:
-
-1. Resumen y tiempo estimado de cada pedido (`mostrarResumen()` + `calcularTiempoEntrega()`).
-2. Asignación de repartidor automática y manual (`asignarRepartidor()` /
-   `asignarRepartidor(String)`).
-3. Despacho de dos pedidos y cancelación de otro, incluyendo los casos inválidos (cancelar uno
-   ya despachado, despachar uno ya cancelado).
-4. Historial final de entregas (`verHistorial()`), con el estado de cada pedido.
