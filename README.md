@@ -1,9 +1,10 @@
-# Semana 2 Desarrollo orientado a objetos II
+# Sistema de entregas SpeedFast
 
-Proyecto formativo en Java que simula el sistema de asignación y estimación de tiempos de
-entrega de **SpeedFast**, una empresa de reparto a domicilio con tres tipos de servicio: comida,
-encomiendas y compras express. El proyecto se desarrolla en dos semanas, aplicando distintos
-conceptos de **polimorfismo** sobre la misma jerarquía de clases.
+Proyecto en Java que simula el sistema de asignación, cálculo de tiempos, despacho,
+cancelación e historial de entregas de **SpeedFast**, una empresa de reparto a domicilio con
+tres tipos de servicio: comida, encomiendas y compras express. El proyecto se desarrolla en
+tres semanas, cada una incorporando un principio distinto de la Programación Orientada a
+Objetos sobre la misma jerarquía de clases.
 
 - **Semana 1 — Sobrecarga y sobreescritura**: `asignarRepartidor()` se **sobrescribe** en cada
   subclase, y `asignarRepartidor(String nombreRepartidor)` es una versión **sobrecargada** (misma
@@ -11,17 +12,104 @@ conceptos de **polimorfismo** sobre la misma jerarquía de clases.
 - **Semana 2 — Clase abstracta**: `Pedido` pasa a ser una clase **abstracta** que centraliza los
   atributos y el método `mostrarResumen()`, y declara el método abstracto
   `calcularTiempoEntrega()`, que cada subclase implementa con su propia fórmula.
+- **Semana 3 — Interfaces**: se agregan las interfaces `Despachable`, `Cancelable` y
+  `Rastreable` para desacoplar el despacho, la cancelación y el historial de la lógica interna
+  de cada pedido, orquestadas por una nueva clase `ControladorDeEnvios`.
 
 ## Estructura del proyecto
 
+Cada paquete agrupa una única responsabilidad: los pedidos, los contratos (interfaces) que
+pueden cumplir, y el componente que orquesta el sistema.
+
 ```
 src/
-├── Main.java                       # Punto de entrada, prueba todas las clases
-└── Gestion_Pedidos/
-    ├── Pedido.java                 # Clase abstracta base
-    ├── PedidoComida.java           # Valida mochila térmica
-    ├── PedidoEncomienda.java       # Valida peso y embalaje
-    └── PedidoExpress.java          # Valida cercanía y disponibilidad inmediata
+├── Main.java                       # Punto de entrada, simula el flujo completo
+├── Gestion_Pedidos/
+│   ├── Pedido.java                 # Clase abstracta base (implementa Despachable, Cancelable)
+│   ├── PedidoComida.java           # Valida mochila térmica
+│   ├── PedidoEncomienda.java       # Valida peso y embalaje
+│   └── PedidoExpress.java          # Valida cercanía y disponibilidad inmediata
+├── Interfaces_Pedido/
+│   ├── Despachable.java            # Interfaz: despachar()
+│   ├── Cancelable.java             # Interfaz: cancelar()
+│   └── Rastreable.java             # Interfaz: verHistorial()
+└── Gestion_Envios/
+    └── ControladorDeEnvios.java    # Orquesta asignación, despacho, cancelación e historial
+```
+
+## Diagrama de clases
+
+```mermaid
+classDiagram
+    class Pedido {
+        <<abstract>>
+        #int idPedido
+        #String direccionEntrega
+        #double distanciaKm
+        #String tipoPedido
+        #String estado
+        +mostrarResumen() void
+        +calcularTiempoEntrega() int*
+        +asignarRepartidor() void
+        +asignarRepartidor(String nombreRepartidor) void
+        +despachar() void
+        +cancelar() void
+    }
+
+    class PedidoComida {
+        -boolean mochilaTermica
+        +calcularTiempoEntrega() int
+        +asignarRepartidor(String nombreRepartidor) void
+    }
+
+    class PedidoEncomienda {
+        -double pesoKg
+        -boolean embalajeCorrecto
+        +calcularTiempoEntrega() int
+        +asignarRepartidor(String nombreRepartidor) void
+    }
+
+    class PedidoExpress {
+        -boolean disponibilidadInmediata
+        +calcularTiempoEntrega() int
+        +asignarRepartidor(String nombreRepartidor) void
+    }
+
+    class Despachable {
+        <<interface>>
+        +despachar() void
+    }
+
+    class Cancelable {
+        <<interface>>
+        +cancelar() void
+    }
+
+    class Rastreable {
+        <<interface>>
+        +verHistorial() void
+    }
+
+    class ControladorDeEnvios {
+        -List~Pedido~ historial
+        +registrarPedido(Pedido pedido) void
+        +asignarRepartidorAutomatico(Pedido pedido) void
+        +asignarRepartidorManual(Pedido pedido, String nombre) void
+        +mostrarTiempoEstimado(Pedido pedido) void
+        +despacharPedido(Despachable pedido) void
+        +cancelarPedido(Cancelable pedido) void
+        +verHistorial() void
+    }
+
+    Pedido <|-- PedidoComida
+    Pedido <|-- PedidoEncomienda
+    Pedido <|-- PedidoExpress
+    Pedido ..|> Despachable
+    Pedido ..|> Cancelable
+    ControladorDeEnvios ..|> Rastreable
+    ControladorDeEnvios "1" o-- "*" Pedido : historial
+    ControladorDeEnvios ..> Despachable : usa
+    ControladorDeEnvios ..> Cancelable : usa
 ```
 
 ## Jerarquía de clases
@@ -36,6 +124,7 @@ Atributos comunes a todo pedido:
 | `direccionEntrega`  | `String` | Dirección donde se debe entregar                |
 | `distanciaKm`       | `double` | Distancia a recorrer, usada para estimar el tiempo |
 | `tipoPedido`        | `String` | Etiqueta del tipo de pedido (usada en los logs de asignación) |
+| `estado`            | `String` | `Pendiente`, `Despachado` o `Cancelado`          |
 
 Métodos:
 
@@ -45,6 +134,9 @@ public abstract int calcularTiempoEntrega(); // abstracto: cada subclase define 
 
 public void asignarRepartidor()                       // sobrescrito por cada subclase
 public void asignarRepartidor(String nombreRepartidor) // sobrecargado y sobrescrito
+
+public void despachar()   // implementa Despachable
+public void cancelar()    // implementa Cancelable
 ```
 
 ### `PedidoComida extends Pedido`
@@ -68,6 +160,46 @@ Agrega `disponibilidadInmediata` (`boolean`).
 
 - `calcularTiempoEntrega()`: **10 min base**; si `distanciaKm > 5`, se suman **5 min extra**.
 - `asignarRepartidor(String)`: valida cercanía/disponibilidad inmediata del repartidor.
+
+## Semana 3: interfaces y `ControladorDeEnvios`
+
+Se agregan tres interfaces en el paquete `Interfaces_Pedido`, cada una con una única
+responsabilidad:
+
+- **`Despachable`** → `despachar()`
+- **`Cancelable`** → `cancelar()`
+- **`Rastreable`** → `verHistorial()`
+
+`Pedido` (en `Gestion_Pedidos`) implementa `Despachable` y `Cancelable`, ya que despachar o
+cancelar es una operación propia de cada pedido individual (cambia su `estado` interno). Un
+pedido ya `Despachado` no puede cancelarse, y uno `Cancelado` no puede despacharse.
+
+`Rastreable`, en cambio, se implementa en `ControladorDeEnvios` (paquete `Gestion_Envios`),
+porque el historial es una responsabilidad del sistema (que administra una lista de pedidos),
+no de un pedido individual. Al vivir en su propio paquete, `ControladorDeEnvios` no depende de
+los detalles internos de `Gestion_Pedidos`, solo de las interfaces que necesita.
+`ControladorDeEnvios` mantiene internamente un `ArrayList<Pedido>` y expone:
+
+- `registrarPedido(Pedido)` — agrega un pedido al historial.
+- `asignarRepartidorAutomatico(Pedido)` / `asignarRepartidorManual(Pedido, String)` — delegan en
+  las versiones sobrescrita y sobrecargada de `asignarRepartidor()`.
+- `mostrarTiempoEstimado(Pedido)` — llama a `mostrarResumen()` y `calcularTiempoEntrega()`.
+- `despacharPedido(Despachable)` / `cancelarPedido(Cancelable)` — reciben el **tipo interfaz**,
+  no `Pedido`, por lo que el controlador no depende de la jerarquía concreta de pedidos.
+- `verHistorial()` — imprime cada pedido registrado junto a su estado actual.
+
+### Contribución a escalabilidad, reutilización y mantenibilidad
+
+- **Escalabilidad**: agregar un nuevo tipo de servicio (por ejemplo, `PedidoProgramado`) solo
+  requiere extender `Pedido` e implementar `calcularTiempoEntrega()` y
+  `asignarRepartidor(String)`; el resto del sistema (`ControladorDeEnvios`, interfaces) no
+  cambia.
+- **Reutilización**: `ControladorDeEnvios` opera sobre `Despachable` y `Cancelable`, por lo que
+  cualquier clase futura que implemente esas interfaces (no solo `Pedido`) puede reutilizar la
+  misma lógica de despacho/cancelación sin modificar el controlador.
+- **Mantenibilidad**: separar `verHistorial()` en una interfaz distinta a `Pedido` evita que la
+  clase abstracta cargue con responsabilidades ajenas a un pedido individual; un cambio en cómo
+  se presenta el historial afecta solo a `ControladorDeEnvios`, no a la jerarquía de pedidos.
 
 ## Semana 2: clase abstracta y `calcularTiempoEntrega()`
 
@@ -102,9 +234,12 @@ Asignando repartidor...
 
 ## `Main.java`
 
-1. Crea un arreglo `Pedido[]` con una instancia de cada subclase y, para cada una, llama a
-   `mostrarResumen()` y `calcularTiempoEntrega()`, imprimiendo los tiempos estimados de forma
-   comparativa (semana 2).
-2. Reutiliza el mismo arreglo para llamar a `asignarRepartidor()` y
-   `asignarRepartidor(String)` en sus versiones sobrescrita y sobrecargada (semana 1).
+`Main` crea un `ControladorDeEnvios` y un pedido de cada tipo, los registra, y simula el flujo
+completo del sistema:
 
+1. Resumen y tiempo estimado de cada pedido (`mostrarResumen()` + `calcularTiempoEntrega()`).
+2. Asignación de repartidor automática y manual (`asignarRepartidor()` /
+   `asignarRepartidor(String)`).
+3. Despacho de dos pedidos y cancelación de otro, incluyendo los casos inválidos (cancelar uno
+   ya despachado, despachar uno ya cancelado).
+4. Historial final de entregas (`verHistorial()`), con el estado de cada pedido.
