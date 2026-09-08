@@ -286,19 +286,3 @@ Asignando repartidor...
 → Verificando mochila térmica... OK
 → Pedido asignado a Juan Pérez
 ```
-
-## `Main.java`
-
-`Main` (semana 4) crea 6 pedidos (2 `PedidoComida`, 2 `PedidoEncomienda`, 2 `PedidoExpress`),
-los registra en un `ControladorDeEnvios`, cancela uno para probar la validación cruzada, y
-arma 3 objetos `Repartidor` con 2 pedidos cada uno. Luego:
-
-1. Envía los 3 repartidores a un `ExecutorService` (`newFixedThreadPool(3)`), que los ejecuta
-   **en paralelo** como hilos independientes.
-2. Espera con `shutdown()` + `awaitTermination(...)` a que **todos** terminen sus entregas
-   antes de continuar.
-3. Muestra el historial final (`verHistorial()`) con el estado de cada uno de los 6 pedidos.
-
-Cada `Repartidor`, dentro de su hilo, ya reutiliza `calcularTiempoEntrega()`,
-`mostrarResumen()` (heredados de `Pedido`) y `despachar()` (interfaz `Despachable`) de las
-semanas anteriores.
