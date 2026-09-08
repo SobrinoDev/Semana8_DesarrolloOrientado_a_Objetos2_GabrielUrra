@@ -1,10 +1,11 @@
 # Sistema de entregas SpeedFast
 
 Proyecto en Java que simula el sistema de asignación, cálculo de tiempos, despacho,
-cancelación e historial de entregas de **SpeedFast**, una empresa de reparto a domicilio con
-tres tipos de servicio: comida, encomiendas y compras express. El proyecto se desarrolla en
-tres semanas, cada una incorporando un principio distinto de la Programación Orientada a
-Objetos sobre la misma jerarquía de clases.
+cancelación, historial y entrega concurrente de pedidos de **SpeedFast**, una empresa de
+reparto a domicilio con tres tipos de servicio: comida, encomiendas y compras express. El
+proyecto se desarrolla en cuatro semanas, cada una incorporando un principio distinto de la
+Programación Orientada a Objetos (y, en la última, de concurrencia) sobre la misma jerarquía
+de clases.
 
 - **Semana 1 — Sobrecarga y sobreescritura**: `asignarRepartidor()` se **sobrescribe** en cada
   subclase, y `asignarRepartidor(String nombreRepartidor)` es una versión **sobrecargada** (misma
@@ -15,6 +16,9 @@ Objetos sobre la misma jerarquía de clases.
 - **Semana 3 — Interfaces**: se agregan las interfaces `Despachable`, `Cancelable` y
   `Rastreable` para desacoplar el despacho, la cancelación y el historial de la lógica interna
   de cada pedido, orquestadas por una nueva clase `ControladorDeEnvios`.
+- **Semana 4 — Concurrencia**: se agrega la clase `Repartidor`, que implementa `Runnable` y
+  entrega su lista de pedidos en un hilo independiente; `Main` ejecuta varios repartidores en
+  paralelo con `ExecutorService`.
 
 ## Estructura del proyecto
 
@@ -33,8 +37,10 @@ src/
 │   ├── Despachable.java            # Interfaz: despachar()
 │   ├── Cancelable.java             # Interfaz: cancelar()
 │   └── Rastreable.java             # Interfaz: verHistorial()
-└── Gestion_Envios/
-    └── ControladorDeEnvios.java    # Orquesta asignación, despacho, cancelación e historial
+├── Gestion_Envios/
+│   └── ControladorDeEnvios.java    # Orquesta asignación, despacho, cancelación e historial
+└── Concurrencia/
+    └── Repartidor.java             # Runnable: entrega su lista de pedidos en un hilo propio
 ```
 
 ## Diagrama de clases
@@ -101,6 +107,17 @@ classDiagram
         +verHistorial() void
     }
 
+    class Repartidor {
+        -String nombre
+        -List~Pedido~ pedidosAsignados
+        +run() void
+    }
+
+    class Runnable {
+        <<interface>>
+        +run() void
+    }
+
     Pedido <|-- PedidoComida
     Pedido <|-- PedidoEncomienda
     Pedido <|-- PedidoExpress
@@ -110,6 +127,8 @@ classDiagram
     ControladorDeEnvios "1" o-- "*" Pedido : historial
     ControladorDeEnvios ..> Despachable : usa
     ControladorDeEnvios ..> Cancelable : usa
+    Repartidor ..|> Runnable
+    Repartidor "1" o-- "*" Pedido : pedidosAsignados
 ```
 
 ## Jerarquía de clases
@@ -160,6 +179,42 @@ Agrega `disponibilidadInmediata` (`boolean`).
 
 - `calcularTiempoEntrega()`: **10 min base**; si `distanciaKm > 5`, se suman **5 min extra**.
 - `asignarRepartidor(String)`: valida cercanía/disponibilidad inmediata del repartidor.
+
+## Semana 4: concurrencia con `Repartidor` y `ExecutorService`
+
+Se agrega el paquete `Concurrencia` con la clase `Repartidor`, que simula a un repartidor
+entregando su lista de pedidos en un **hilo independiente**:
+
+- Implementa `Runnable`; su atributo `nombre` y su lista `pedidosAsignados` (`List<Pedido>`)
+  se reciben por constructor.
+- `run()` recorre los pedidos **secuencialmente** (un repartidor entrega uno a la vez), pero
+  cada `Repartidor` corre en su propio hilo, por lo que varios repartidores entregan **en
+  paralelo** entre sí.
+- Por cada pedido: imprime el tiempo estimado (`calcularTiempoEntrega()`), simula la entrega
+  con `Thread.sleep()` usando una duración aleatoria (1 a 3 segundos,
+  `ThreadLocalRandom.nextInt(1000, 3001)`), y llama a `pedido.despachar()` (interfaz
+  `Despachable`, reutilizada de la semana 3). Si el pedido ya fue cancelado, `despachar()` lo
+  rechaza y `Repartidor` lo reporta en vez de marcarlo como entregado.
+
+`Main` reutiliza toda la jerarquía y las interfaces previas: crea 6 pedidos (2 de cada tipo),
+los registra en un `ControladorDeEnvios` (`Rastreable`), cancela uno de antemano para probar
+la validación cruzada con `Cancelable`, y arma 3 repartidores con 2 pedidos cada uno.
+
+La ejecución paralela se hace con `ExecutorService`:
+
+```java
+ExecutorService executor = Executors.newFixedThreadPool(3);
+executor.submit(repartidor1);
+executor.submit(repartidor2);
+executor.submit(repartidor3);
+
+executor.shutdown();
+executor.awaitTermination(1, TimeUnit.MINUTES); // espera a que los 3 terminen
+```
+
+Como las esperas (`Thread.sleep`) son aleatorias, el orden de los mensajes en consola varía en
+cada ejecución — evidencia visual de que los tres repartidores avanzan de forma simultánea e
+independiente, y no uno después del otro.
 
 ## Semana 3: interfaces y `ControladorDeEnvios`
 
@@ -234,12 +289,16 @@ Asignando repartidor...
 
 ## `Main.java`
 
-`Main` crea un `ControladorDeEnvios` y un pedido de cada tipo, los registra, y simula el flujo
-completo del sistema:
+`Main` (semana 4) crea 6 pedidos (2 `PedidoComida`, 2 `PedidoEncomienda`, 2 `PedidoExpress`),
+los registra en un `ControladorDeEnvios`, cancela uno para probar la validación cruzada, y
+arma 3 objetos `Repartidor` con 2 pedidos cada uno. Luego:
 
-1. Resumen y tiempo estimado de cada pedido (`mostrarResumen()` + `calcularTiempoEntrega()`).
-2. Asignación de repartidor automática y manual (`asignarRepartidor()` /
-   `asignarRepartidor(String)`).
-3. Despacho de dos pedidos y cancelación de otro, incluyendo los casos inválidos (cancelar uno
-   ya despachado, despachar uno ya cancelado).
-4. Historial final de entregas (`verHistorial()`), con el estado de cada pedido.
+1. Envía los 3 repartidores a un `ExecutorService` (`newFixedThreadPool(3)`), que los ejecuta
+   **en paralelo** como hilos independientes.
+2. Espera con `shutdown()` + `awaitTermination(...)` a que **todos** terminen sus entregas
+   antes de continuar.
+3. Muestra el historial final (`verHistorial()`) con el estado de cada uno de los 6 pedidos.
+
+Cada `Repartidor`, dentro de su hilo, ya reutiliza `calcularTiempoEntrega()`,
+`mostrarResumen()` (heredados de `Pedido`) y `despachar()` (interfaz `Despachable`) de las
+semanas anteriores.

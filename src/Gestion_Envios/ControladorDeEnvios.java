@@ -16,12 +16,10 @@ public class ControladorDeEnvios implements Rastreable {
         historial.add(pedido);
     }
 
-    // Asignación automática: delega en la versión sobrescrita de cada subclase
     public void asignarRepartidorAutomatico(Pedido pedido) {
         pedido.asignarRepartidor();
     }
 
-    // Asignación manual: delega en la versión sobrecargada
     public void asignarRepartidorManual(Pedido pedido, String nombreRepartidor) {
         pedido.asignarRepartidor(nombreRepartidor);
     }
@@ -31,12 +29,10 @@ public class ControladorDeEnvios implements Rastreable {
         System.out.println("Tiempo estimado de entrega: " + pedido.calcularTiempoEntrega() + " minutos");
     }
 
-    // Trabaja contra la interfaz Despachable, no contra Pedido: desacopla la operación de despacho
     public void despacharPedido(Despachable pedido) {
         pedido.despachar();
     }
 
-    // Trabaja contra la interfaz Cancelable, no contra Pedido: desacopla la operación de cancelación
     public void cancelarPedido(Cancelable pedido) {
         pedido.cancelar();
     }

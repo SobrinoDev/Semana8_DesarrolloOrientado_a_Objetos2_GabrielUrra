@@ -31,7 +31,6 @@ public abstract class Pedido implements Despachable, Cancelable {
         System.out.println("[" + tipoPedido + "]");
         System.out.println("Asignando repartidor...");
     }
-
     public void asignarRepartidor(String nombreRepartidor) {
         System.out.println("→ Pedido asignado a " + nombreRepartidor);
     }

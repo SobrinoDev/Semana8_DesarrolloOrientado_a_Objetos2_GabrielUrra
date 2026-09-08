@@ -9,7 +9,6 @@ public class PedidoExpress extends Pedido {
         this.disponibilidadInmediata = disponibilidadInmediata;
     }
 
-    // Tiempo = 10 min base; si la distancia es mayor a 5 km, se agregan 5 min extra
     @Override
     public int calcularTiempoEntrega() {
         int tiempo = 10;
