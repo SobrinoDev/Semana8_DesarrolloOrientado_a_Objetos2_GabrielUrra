@@ -1,11 +1,10 @@
 # Sistema de entregas SpeedFast
 
 Proyecto en Java que simula el sistema de asignación, cálculo de tiempos, despacho,
-cancelación, historial y entrega concurrente de pedidos de **SpeedFast**, una empresa de
-reparto a domicilio con tres tipos de servicio: comida, encomiendas y compras express. El
-proyecto se desarrolla en cuatro semanas, cada una incorporando un principio distinto de la
-Programación Orientada a Objetos (y, en la última, de concurrencia) sobre la misma jerarquía
-de clases.
+cancelación, historial, entrega concurrente y sincronización de acceso a recursos compartidos
+de **SpeedFast**, una empresa de reparto a domicilio con tres tipos de servicio: comida,
+encomiendas y compras express. El proyecto se desarrolla en cinco semanas, cada una
+incorporando un principio distinto de la Programación Orientada a Objetos y la concurrencia.
 
 - **Semana 1 — Sobrecarga y sobreescritura**: `asignarRepartidor()` se **sobrescribe** en cada
   subclase, y `asignarRepartidor(String nombreRepartidor)` es una versión **sobrecargada** (misma
@@ -19,6 +18,9 @@ de clases.
 - **Semana 4 — Concurrencia**: se agrega la clase `Repartidor`, que implementa `Runnable` y
   entrega su lista de pedidos en un hilo independiente; `Main` ejecuta varios repartidores en
   paralelo con `ExecutorService`.
+- **Semana 5 — Sincronización**: nuevo paquete `Sincronizacion`, autocontenido, donde varios
+  `Repartidor` compiten por retirar pedidos de una `ZonaDeCarga` compartida usando métodos
+  `synchronized`, garantizando que cada pedido se entregue una única vez.
 
 ## Estructura del proyecto
 
@@ -39,9 +41,20 @@ src/
 │   └── Rastreable.java             # Interfaz: verHistorial()
 ├── Gestion_Envios/
 │   └── ControladorDeEnvios.java    # Orquesta asignación, despacho, cancelación e historial
-└── Concurrencia/
-    └── Repartidor.java             # Runnable: entrega su lista de pedidos en un hilo propio
+├── Concurrencia/
+│   └── Repartidor.java             # Runnable: entrega su lista de pedidos en un hilo propio
+└── Sincronizacion/                 # Ejercicio autocontenido de la semana 5 (no depende de lo anterior)
+    ├── EstadoPedido.java           # enum: PENDIENTE, EN_REPARTO, ENTREGADO
+    ├── Pedido.java                 # id, direccionEntrega, estado + toString()
+    ├── ZonaDeCarga.java            # Recurso compartido: agregarPedido()/retirarPedido() synchronized
+    └── Repartidor.java             # Runnable: compite por pedidos en la ZonaDeCarga compartida
 ```
+
+> Nota: `Sincronizacion` define sus propias clases `Pedido` y `Repartidor`, independientes de
+> `Gestion_Pedidos.Pedido` y `Concurrencia.Repartidor`. La actividad de la semana 5 pide una
+> clase `Pedido` mínima (`id`, `direccionEntrega`, `estado`) enfocada en sincronización, distinta
+> del `Pedido` abstracto y con reglas de negocio de las semanas 1-4; por eso vive en su propio
+> paquete en vez de mezclarse con la jerarquía existente.
 
 ## Diagrama de clases
 
@@ -179,6 +192,77 @@ Agrega `disponibilidadInmediata` (`boolean`).
 
 - `calcularTiempoEntrega()`: **10 min base**; si `distanciaKm > 5`, se suman **5 min extra**.
 - `asignarRepartidor(String)`: valida cercanía/disponibilidad inmediata del repartidor.
+
+## Semana 5: sincronización con `ZonaDeCarga`
+
+Paquete `Sincronizacion`, un ejercicio independiente centrado en **evitar condiciones de
+carrera** cuando varios hilos acceden a un mismo recurso compartido.
+
+```mermaid
+classDiagram
+    class EstadoPedido {
+        <<enumeration>>
+        PENDIENTE
+        EN_REPARTO
+        ENTREGADO
+    }
+
+    class Pedido {
+        -int id
+        -String direccionEntrega
+        -EstadoPedido estado
+        +getId() int
+        +getDireccionEntrega() String
+        +getEstado() EstadoPedido
+        +setEstado(EstadoPedido nuevoEstado) void
+        +setEstado(String nuevoEstado) void
+        +toString() String
+    }
+
+    class ZonaDeCarga {
+        -Queue~Pedido~ pedidosPendientes
+        +agregarPedido(Pedido p) void
+        +retirarPedido() Pedido
+        +pedidosRestantes() int
+    }
+
+    class Repartidor {
+        -String nombre
+        -ZonaDeCarga zonaDeCarga
+        +run() void
+    }
+
+    Pedido "1" --> "1" EstadoPedido : estado
+    ZonaDeCarga "1" o-- "*" Pedido : pedidosPendientes
+    Repartidor "*" --> "1" ZonaDeCarga : comparten
+    Repartidor ..|> Runnable
+```
+
+- **`EstadoPedido`** (enum): `PENDIENTE`, `EN_REPARTO`, `ENTREGADO`. Reemplaza estados de texto
+  libre por constantes verificadas en tiempo de compilación.
+- **`Pedido`**: `id`, `direccionEntrega` y `estado` (tipado como `EstadoPedido`), con
+  constructor, getters, `toString()` y **dos `setEstado()` sobrecargados** — uno que recibe el
+  enum directamente y otro que recibe un `String` (`EstadoPedido.valueOf(...)`), tal como pide
+  la actividad.
+- **`ZonaDeCarga`**: recurso compartido entre todos los repartidores. Usa una `Queue<Pedido>`
+  (`LinkedList`) protegida con los métodos `synchronized void agregarPedido(Pedido)` y
+  `synchronized Pedido retirarPedido()`. Al ser `synchronized`, solo un hilo a la vez puede
+  ejecutar cualquiera de los dos métodos sobre la misma instancia, así que dos repartidores
+  **nunca** pueden retirar el mismo pedido — `retirarPedido()` es la única puerta de entrada a
+  la cola, y `poll()` extrae y elimina en un solo paso atómico dentro de la sección crítica.
+- **`Repartidor`**: implementa `Runnable` con `nombre` y una referencia a la `ZonaDeCarga`
+  compartida (no una lista propia, a diferencia del `Repartidor` de la semana 4). En `run()`,
+  repite en bucle: retira un pedido, lo pasa a `EN_REPARTO`, simula la entrega con
+  `Thread.sleep()` (duración aleatoria de 1 a 3 segundos), y lo marca `ENTREGADO`. El bucle
+  termina cuando `retirarPedido()` devuelve `null` (zona de carga vacía).
+
+`Main` instancia una `ZonaDeCarga`, agrega 6 pedidos, y lanza 3 `Repartidor` mediante un
+`ExecutorService` de tamaño fijo; espera con `shutdown()` + `awaitTermination()` a que los tres
+vacíen la zona de carga antes de imprimir "Todos los pedidos han sido entregados
+correctamente". Como los tres repartidores compiten por la misma cola (en vez de tener listas
+fijas asignadas), el reparto de pedidos entre ellos varía en cada ejecución, pero el total
+entregado siempre es igual a la cantidad de pedidos agregados — evidencia de que no hay
+retiros duplicados ni pedidos perdidos.
 
 ## Semana 4: concurrencia con `Repartidor` y `ExecutorService`
 
