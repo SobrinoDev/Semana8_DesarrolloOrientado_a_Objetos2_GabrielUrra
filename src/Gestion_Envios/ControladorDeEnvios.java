@@ -16,6 +16,11 @@ public class ControladorDeEnvios implements Rastreable {
         historial.add(pedido);
     }
 
+    // Vista de solo lectura: la interfaz gráfica la usa para poblar la tabla de pedidos
+    public List<Pedido> obtenerPedidos() {
+        return List.copyOf(historial);
+    }
+
     public void asignarRepartidorAutomatico(Pedido pedido) {
         pedido.asignarRepartidor();
     }

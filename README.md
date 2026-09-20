@@ -1,10 +1,11 @@
 # Sistema de entregas SpeedFast
 
 Proyecto en Java que simula el sistema de asignación, cálculo de tiempos, despacho,
-cancelación, historial, entrega concurrente y sincronización de acceso a recursos compartidos
-de **SpeedFast**, una empresa de reparto a domicilio con tres tipos de servicio: comida,
-encomiendas y compras express. El proyecto se desarrolla en cinco semanas, cada una
-incorporando un principio distinto de la Programación Orientada a Objetos y la concurrencia.
+cancelación, historial, entrega concurrente, sincronización de acceso a recursos compartidos e
+interfaz gráfica de escritorio de **SpeedFast**, una empresa de reparto a domicilio con tres
+tipos de servicio: comida, encomiendas y compras express. El proyecto se desarrolla en seis
+semanas, cada una incorporando un principio distinto de la Programación Orientada a Objetos,
+la concurrencia y las interfaces gráficas.
 
 - **Semana 1 — Sobrecarga y sobreescritura**: `asignarRepartidor()` se **sobrescribe** en cada
   subclase, y `asignarRepartidor(String nombreRepartidor)` es una versión **sobrecargada** (misma
@@ -21,6 +22,10 @@ incorporando un principio distinto de la Programación Orientada a Objetos y la 
 - **Semana 5 — Sincronización**: nuevo paquete `Sincronizacion`, autocontenido, donde varios
   `Repartidor` compiten por retirar pedidos de una `ZonaDeCarga` compartida usando métodos
   `synchronized`, garantizando que cada pedido se entregue una única vez.
+- **Semana 6 — Interfaz gráfica**: nuevo paquete `Gui` con ventanas Swing (`VentanaPrincipal`,
+  `VentanaRegistroPedido`, `VentanaListaPedidos`) que reutilizan el modelo y el
+  `ControladorDeEnvios` de las semanas 1 a 4 para registrar, listar y asignar/despachar pedidos
+  desde una aplicación de escritorio.
 
 ## Estructura del proyecto
 
@@ -29,7 +34,13 @@ pueden cumplir, y el componente que orquesta el sistema.
 
 ```
 src/
-├── Main.java                       # Punto de entrada, simula el flujo completo
+├── Main.java                       # Entrada de consola de la semana 5 (Sincronizacion)
+├── main/
+│   └── Main.java                   # Entrada de la app gráfica: new VentanaPrincipal()
+├── Gui/
+│   ├── VentanaPrincipal.java       # JFrame principal: navegación + asignar/iniciar entrega
+│   ├── VentanaRegistroPedido.java  # JFrame: formulario para crear un Pedido
+│   └── VentanaListaPedidos.java    # JFrame: JTable con los pedidos registrados
 ├── Gestion_Pedidos/
 │   ├── Pedido.java                 # Clase abstracta base (implementa Despachable, Cancelable)
 │   ├── PedidoComida.java           # Valida mochila térmica
@@ -192,6 +203,57 @@ Agrega `disponibilidadInmediata` (`boolean`).
 
 - `calcularTiempoEntrega()`: **10 min base**; si `distanciaKm > 5`, se suman **5 min extra**.
 - `asignarRepartidor(String)`: valida cercanía/disponibilidad inmediata del repartidor.
+
+## Semana 6: interfaz gráfica con Swing
+
+Paquete `Gui`, que da a todo el sistema construido en las semanas 1-4 (jerarquía `Pedido`,
+`ControladorDeEnvios`, interfaces, `Repartidor`) una **interfaz de escritorio** para operarlo
+sin usar la consola.
+
+- **`VentanaPrincipal`** (`JFrame`): ventana de navegación. Crea la única instancia de
+  `ControladorDeEnvios` de la aplicación y la comparte con cada ventana hija que abre, para que
+  todas trabajen sobre los mismos datos. Organiza tres botones con `BorderLayout` (título al
+  norte) + `GridLayout(3,1)` (botones al centro):
+  - **Registrar pedido** → abre `VentanaRegistroPedido`.
+  - **Listar pedidos** → abre `VentanaListaPedidos`.
+  - **Asignar repartidor / Iniciar entrega** → pide (con `JOptionPane`) elegir un pedido
+    `Pendiente` y el nombre del repartidor, llama a `asignarRepartidorAutomatico()` /
+    `asignarRepartidorManual()` (semana 1) y luego lanza un `Concurrencia.Repartidor` en un
+    **hilo aparte** para no congelar la interfaz mientras se simula la entrega; al terminar,
+    `SwingUtilities.invokeLater(...)` muestra la confirmación de forma segura desde el hilo de
+    eventos de Swing.
+
+- **`VentanaRegistroPedido`** (`JFrame`): formulario con ID, Dirección, Distancia (km) y un
+  `JComboBox` de Tipo (Comida / Encomienda / Express). El botón **Guardar** valida los campos
+  (ID numérico y único, dirección no vacía, distancia positiva), construye la subclase de
+  `Pedido` correspondiente, la registra en el `ControladorDeEnvios` compartido y confirma con
+  `JOptionPane`.
+
+- **`VentanaListaPedidos`** (`JFrame`): una `JTable` respaldada por `DefaultTableModel`
+  (ID, Dirección, Tipo, Distancia, Tiempo estimado, Estado), de solo lectura. El botón
+  **Refrescar** vuelve a leer `controlador.obtenerPedidos()` y repuebla la tabla, para reflejar
+  pedidos agregados o despachados después de abrirla.
+
+La navegación entre ventanas y el dato compartido se resuelven pasando la misma referencia de
+`ControladorDeEnvios` por constructor a cada ventana — el mismo patrón de desacoplamiento por
+interfaces/controlador ya usado en la semana 3, ahora aplicado también a la capa visual.
+
+### `main.Main`: punto de entrada de la aplicación gráfica
+
+```java
+package main;
+
+public class Main {
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(VentanaPrincipal::new);
+    }
+}
+```
+
+`new VentanaPrincipal()` se ejecuta dentro de `invokeLater` para construir la interfaz en el
+hilo de eventos de Swing (buena práctica estándar), tal como pide la actividad. El `Main.java`
+de la raíz del proyecto (sin paquete) se conserva como punto de entrada de la simulación de
+consola de la semana 5.
 
 ## Semana 5: sincronización con `ZonaDeCarga`
 
