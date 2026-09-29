@@ -1,11 +1,11 @@
 # Sistema de entregas SpeedFast
 
 Proyecto en Java que simula el sistema de asignación, cálculo de tiempos, despacho,
-cancelación, historial, entrega concurrente, sincronización de acceso a recursos compartidos e
-interfaz gráfica de escritorio de **SpeedFast**, una empresa de reparto a domicilio con tres
-tipos de servicio: comida, encomiendas y compras express. El proyecto se desarrolla en seis
-semanas, cada una incorporando un principio distinto de la Programación Orientada a Objetos,
-la concurrencia y las interfaces gráficas.
+cancelación, historial, entrega concurrente, sincronización de acceso a recursos compartidos,
+interfaz gráfica de escritorio y persistencia en base de datos de **SpeedFast**, una empresa de
+reparto a domicilio con tres tipos de servicio: comida, encomiendas y compras express. El
+proyecto se desarrolla en siete semanas, cada una incorporando un principio distinto de la
+Programación Orientada a Objetos, la concurrencia, las interfaces gráficas y el acceso a datos.
 
 - **Semana 1 — Sobrecarga y sobreescritura**: `asignarRepartidor()` se **sobrescribe** en cada
   subclase, y `asignarRepartidor(String nombreRepartidor)` es una versión **sobrecargada** (misma
@@ -26,6 +26,10 @@ la concurrencia y las interfaces gráficas.
   `VentanaRegistroPedido`, `VentanaListaPedidos`) que reutilizan el modelo y el
   `ControladorDeEnvios` de las semanas 1 a 4 para registrar, listar y asignar/despachar pedidos
   desde una aplicación de escritorio.
+- **Semana 7 — JDBC**: nuevos paquetes `dao` y `modelo`; `ConexionDB` abre la conexión con
+  `DriverManager`, y `PedidoDAO`/`RepartidorDAO`/`EntregaDAO` insertan y consultan datos en MySQL
+  con `PreparedStatement`/`ResultSet`. Las ventanas de la semana 6 se modifican para leer y
+  escribir directamente en la base de datos en vez de una lista en memoria.
 
 ## Estructura del proyecto
 
@@ -38,9 +42,19 @@ src/
 ├── main/
 │   └── Main.java                   # Entrada de la app gráfica: new VentanaPrincipal()
 ├── Gui/
-│   ├── VentanaPrincipal.java       # JFrame principal: navegación + asignar/iniciar entrega
-│   ├── VentanaRegistroPedido.java  # JFrame: formulario para crear un Pedido
-│   └── VentanaListaPedidos.java    # JFrame: JTable con los pedidos registrados
+│   ├── VentanaPrincipal.java         # JFrame principal: navegación + asignar/iniciar entrega
+│   ├── VentanaRegistroPedido.java    # JFrame: formulario que inserta un Pedido en MySQL
+│   ├── VentanaRegistroRepartidor.java # JFrame: formulario que inserta un Repartidor en MySQL
+│   └── VentanaListaPedidos.java      # JFrame: JTable con los pedidos leídos desde MySQL
+├── dao/
+│   ├── ConexionDB.java              # Abre la conexión JDBC con DriverManager
+│   ├── PedidoDAO.java               # guardar() / listarTodos() / actualizarEstado()
+│   ├── RepartidorDAO.java           # guardar() / listarTodos()
+│   └── EntregaDAO.java              # guardar(): registra pedido + repartidor + fecha/hora
+├── modelo/
+│   ├── Pedido.java                  # POJO plano: id, direccion, tipo, estado
+│   ├── Repartidor.java              # POJO plano: id, nombre
+│   └── Entrega.java                 # POJO plano: id, idPedido, idRepartidor, fecha, hora
 ├── Gestion_Pedidos/
 │   ├── Pedido.java                 # Clase abstracta base (implementa Despachable, Cancelable)
 │   ├── PedidoComida.java           # Valida mochila térmica
@@ -66,6 +80,18 @@ src/
 > clase `Pedido` mínima (`id`, `direccionEntrega`, `estado`) enfocada en sincronización, distinta
 > del `Pedido` abstracto y con reglas de negocio de las semanas 1-4; por eso vive en su propio
 > paquete en vez de mezclarse con la jerarquía existente.
+
+> Nota: `modelo.Pedido`/`modelo.Repartidor` son POJOs planos que reflejan exactamente las
+> columnas de las tablas MySQL (la tabla `pedido` no tiene `distanciaKm` ni subtipos). Por eso
+> son clases distintas de `Gestion_Pedidos.Pedido`. Desde la semana 7, las ventanas del paquete
+> `Gui` usan estos POJOs + los `dao.*DAO` para persistir en MySQL; `Gestion_Pedidos` y
+> `Gestion_Envios.ControladorDeEnvios` se conservan tal como quedaron en la semana 4 (siguen
+> compilando y `Main.java` de la raíz los sigue usando), pero ya no están conectados a la GUI.
+
+El conector JDBC (`lib/mysql-connector-j-8.4.0.jar`) y el script de creación de la base de
+datos (`sql/speedfast_db.sql`) se incluyen en el repositorio; ver la sección
+["Configuración de MySQL y del conector JDBC"](#configuración-de-mysql-y-del-conector-jdbc)
+más abajo para los pasos de configuración.
 
 ## Diagrama de clases
 
@@ -203,6 +229,80 @@ Agrega `disponibilidadInmediata` (`boolean`).
 
 - `calcularTiempoEntrega()`: **10 min base**; si `distanciaKm > 5`, se suman **5 min extra**.
 - `asignarRepartidor(String)`: valida cercanía/disponibilidad inmediata del repartidor.
+
+## Semana 7: persistencia con JDBC
+
+Nuevos paquetes `dao` y `modelo`. El objetivo es que los formularios de la semana 6 dejen de
+guardar los datos en memoria (`ControladorDeEnvios`) y pasen a leer/escribir directamente en
+MySQL.
+
+- **`modelo.Pedido` / `modelo.Repartidor` / `modelo.Entrega`**: POJOs planos que reflejan
+  exactamente las columnas de las tablas `pedido`, `repartidor` y `entrega` (ver
+  [`sql/speedfast_db.sql`](sql/speedfast_db.sql)). Cada uno tiene un constructor "para insertar"
+  (sin `id`, ya que MySQL lo autogenera) y otro "para reconstruir" (con `id`, usado al leer filas
+  de un `ResultSet`).
+
+- **`dao.ConexionDB`**: abre la conexión con `DriverManager.getConnection(URL, USUARIO,
+  PASSWORD)` contra `jdbc:mysql://localhost:3306/speedfast_db`, y expone un método estático
+  `cerrar(AutoCloseable...)` que las tres clases DAO reutilizan en su bloque `finally` para
+  cerrar `ResultSet`/`Statement`/`Connection` sin duplicar ese código tres veces.
+
+- **`dao.PedidoDAO`**: `guardar(Pedido)` (INSERT con `PreparedStatement`, recupera el id
+  autogenerado con `getGeneratedKeys()`), `listarTodos()` (SELECT, arma la lista recorriendo el
+  `ResultSet`) y `actualizarEstado(int, String)` (UPDATE, usado al asignar un repartidor).
+
+- **`dao.RepartidorDAO`**: `guardar(Repartidor)` y `listarTodos()`, mismo patrón.
+
+- **`dao.EntregaDAO`**: `guardar(Entrega)` — inserta la fila que relaciona `id_pedido` +
+  `id_repartidor` + `fecha` + `hora`, cumpliendo las llaves foráneas del modelo.
+
+Cada método de cada DAO sigue el patrón pedido por la actividad: `try` con la operación JDBC,
+`catch (SQLException e)` que registra el error y vuelve a lanzarlo (para que la ventana que lo
+llamó pueda mostrarlo con `JOptionPane`), y `finally` que cierra los recursos abiertos pase lo
+que pase. Se verificó (sin un MySQL disponible en este entorno) que al no poder conectar, la
+excepción (`CommunicationsException`, subclase de `SQLException`) se captura y propaga
+correctamente sin colgar la aplicación ni dejar recursos sin cerrar.
+
+### Cambios en la interfaz gráfica de la semana 6
+
+- **`VentanaRegistroPedido`**: ya no pide ID ni distancia (no existen en la tabla `pedido`); el
+  formulario quedó en Dirección + Tipo (`JComboBox` con los valores literales `COMIDA` /
+  `ENCOMIENDA` / `EXPRESS` de la columna `tipo`). Al guardar, crea un `modelo.Pedido` con estado
+  inicial `PENDIENTE` y llama a `PedidoDAO.guardar(...)`.
+- **`VentanaRegistroRepartidor`** (nueva): formulario mínimo (Nombre) que llama a
+  `RepartidorDAO.guardar(...)`.
+- **`VentanaListaPedidos`**: la tabla ahora tiene las columnas ID, Dirección, Tipo y Estado
+  (las de la tabla `pedido`), poblada con `PedidoDAO.listarTodos()`; "Refrescar" vuelve a
+  consultar la base de datos.
+- **`VentanaPrincipal`**: agrega un cuarto botón, **Registrar repartidor**. El botón **Asignar
+  repartidor / Iniciar entrega** ahora deja elegir un pedido `PENDIENTE` y un repartidor ya
+  registrados en la base de datos (en vez de escribir el nombre a mano), y al confirmar llama a
+  `EntregaDAO.guardar(...)` seguido de `PedidoDAO.actualizarEstado(id, "EN_REPARTO")`.
+
+`Gestion_Pedidos`, `Interfaces_Pedido`, `Gestion_Envios` y `Concurrencia.Repartidor` (semanas
+1-4) se dejan intactos — siguen compilando y el `Main.java` de la raíz los sigue usando para la
+simulación de consola — pero ya no están conectados a la GUI, que ahora persiste en MySQL.
+
+### Configuración de MySQL y del conector JDBC
+
+1. Instala MySQL (o usa una instancia ya existente) y ejecuta
+   [`sql/speedfast_db.sql`](sql/speedfast_db.sql) — crea la base `speedfast_db` y las tres
+   tablas con sus llaves foráneas.
+2. Edita [`src/dao/ConexionDB.java`](src/dao/ConexionDB.java) y reemplaza `PASSWORD` por la
+   contraseña real de tu usuario `root` de MySQL (o cambia `USUARIO`/`URL` si usas otro usuario
+   u otro puerto).
+3. El conector `mysql-connector-j-8.4.0.jar` ya está en [`lib/`](lib) y registrado como librería
+   del proyecto en `.idea/libraries/mysql_connector_j.xml` (agregado al módulo en el `.iml`), así
+   que IntelliJ debería reconocerlo al abrir el proyecto. Si no aparece, agrégalo manualmente:
+   **File → Project Structure → Libraries → + → Java** y selecciona ese `.jar`.
+4. Ejecuta `main.Main` para abrir la aplicación gráfica.
+
+> No se pudo probar la conexión real a MySQL en el entorno donde se desarrolló este proyecto
+> (no hay un servidor MySQL disponible ahí). Se verificó que el proyecto compila con el
+> conector en el classpath, que la aplicación arranca sin excepciones, y que el manejo de
+> errores de conexión funciona correctamente (ver más arriba) — pero se recomienda probar el
+> flujo completo (registrar pedido/repartidor, listar, asignar) con un MySQL real antes de
+> entregar.
 
 ## Semana 6: interfaz gráfica con Swing
 

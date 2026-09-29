@@ -1,26 +1,25 @@
 package Gui;
 
-import Gestion_Envios.ControladorDeEnvios;
-import Gestion_Pedidos.Pedido;
+import dao.PedidoDAO;
+import modelo.Pedido;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.sql.SQLException;
 
 public class VentanaListaPedidos extends JFrame {
 
-    private static final String[] COLUMNAS = {
-            "ID", "Dirección", "Tipo", "Distancia (km)", "Tiempo estimado (min)", "Estado"
-    };
+    private static final String[] COLUMNAS = {"ID", "Dirección", "Tipo", "Estado"};
 
-    private final ControladorDeEnvios controlador;
+    private final PedidoDAO pedidoDAO;
     private final DefaultTableModel modeloTabla;
 
-    public VentanaListaPedidos(ControladorDeEnvios controlador) {
-        this.controlador = controlador;
+    public VentanaListaPedidos(PedidoDAO pedidoDAO) {
+        this.pedidoDAO = pedidoDAO;
 
         setTitle("Listado de pedidos");
-        setSize(640, 360);
+        setSize(520, 340);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout(10, 10));
@@ -48,15 +47,16 @@ public class VentanaListaPedidos extends JFrame {
 
     private void cargarPedidos() {
         modeloTabla.setRowCount(0);
-        for (Pedido pedido : controlador.obtenerPedidos()) {
-            modeloTabla.addRow(new Object[]{
-                    String.format("%03d", pedido.getIdPedido()),
-                    pedido.getDireccionEntrega(),
-                    pedido.getClass().getSimpleName(),
-                    pedido.getDistanciaKm(),
-                    pedido.calcularTiempoEntrega(),
-                    pedido.getEstado()
-            });
+        try {
+            for (Pedido pedido : pedidoDAO.listarTodos()) {
+                modeloTabla.addRow(new Object[]{
+                        pedido.getId(), pedido.getDireccion(), pedido.getTipo(), pedido.getEstado()
+                });
+            }
+        } catch (SQLException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "No se pudieron cargar los pedidos desde la base de datos:\n" + ex.getMessage(),
+                    "Error de base de datos", JOptionPane.ERROR_MESSAGE);
         }
     }
 }
