@@ -4,7 +4,7 @@ Proyecto en Java que simula el sistema de asignación, cálculo de tiempos, desp
 cancelación, historial, entrega concurrente, sincronización de acceso a recursos compartidos,
 interfaz gráfica de escritorio y persistencia en base de datos de **SpeedFast**, una empresa de
 reparto a domicilio con tres tipos de servicio: comida, encomiendas y compras express. El
-proyecto se desarrolla en siete semanas, cada una incorporando un principio distinto de la
+proyecto se desarrolla en ocho semanas, cada una incorporando un principio distinto de la
 Programación Orientada a Objetos, la concurrencia, las interfaces gráficas y el acceso a datos.
 
 - **Semana 1 — Sobrecarga y sobreescritura**: `asignarRepartidor()` se **sobrescribe** en cada
@@ -30,6 +30,9 @@ Programación Orientada a Objetos, la concurrencia, las interfaces gráficas y e
   `DriverManager`, y `PedidoDAO`/`RepartidorDAO`/`EntregaDAO` insertan y consultan datos en MySQL
   con `PreparedStatement`/`ResultSet`. Las ventanas de la semana 6 se modifican para leer y
   escribir directamente en la base de datos en vez de una lista en memoria.
+- **Semana 8 — CRUD completo**: los DAO pasan a tener `create()/readAll()/update()/delete()` para
+  repartidores, pedidos y entregas (esquema con tablas en plural y `ENUM`), y la interfaz se
+  rehace como una ventana con una pestaña CRUD por entidad, con validaciones y filtros.
 
 ## Estructura del proyecto
 
@@ -42,15 +45,17 @@ src/
 ├── main/
 │   └── Main.java                   # Entrada de la app gráfica: new VentanaPrincipal()
 ├── Gui/
-│   ├── VentanaPrincipal.java         # JFrame principal: navegación + asignar/iniciar entrega
-│   ├── VentanaRegistroPedido.java    # JFrame: formulario que inserta un Pedido en MySQL
-│   ├── VentanaRegistroRepartidor.java # JFrame: formulario que inserta un Repartidor en MySQL
-│   └── VentanaListaPedidos.java      # JFrame: JTable con los pedidos leídos desde MySQL
+│   ├── VentanaPrincipal.java        # JFrame con una pestaña CRUD por entidad
+│   ├── PanelCrud.java               # Base común: tabla, botones, validación y errores SQL
+│   ├── PanelRepartidores.java       # CRUD de repartidores
+│   ├── PanelPedidos.java            # CRUD de pedidos + filtros por estado/tipo
+│   ├── PanelEntregas.java           # CRUD de entregas (combos de pedido/repartidor desde la BD)
+│   └── Item.java                    # Elemento de combo: muestra "id - texto", conserva el id
 ├── dao/
 │   ├── ConexionDB.java              # Abre la conexión JDBC con DriverManager
-│   ├── PedidoDAO.java               # guardar() / listarTodos() / actualizarEstado()
-│   ├── RepartidorDAO.java           # guardar() / listarTodos()
-│   └── EntregaDAO.java              # guardar(): registra pedido + repartidor + fecha/hora
+│   ├── PedidoDAO.java               # create() / readAll() / update() / delete()
+│   ├── RepartidorDAO.java           # create() / readAll() / update() / delete()
+│   └── EntregaDAO.java              # create() / readAll() / update() / delete()
 ├── modelo/
 │   ├── Pedido.java                  # POJO plano: id, direccion, tipo, estado
 │   ├── Repartidor.java              # POJO plano: id, nombre
@@ -230,6 +235,39 @@ Agrega `disponibilidadInmediata` (`boolean`).
 - `calcularTiempoEntrega()`: **10 min base**; si `distanciaKm > 5`, se suman **5 min extra**.
 - `asignarRepartidor(String)`: valida cercanía/disponibilidad inmediata del repartidor.
 
+## Semana 8: CRUD completo con JDBC + Swing
+
+**Base de datos**: [`sql/speedfast_db.sql`](sql/speedfast_db.sql) crea `speedfast_db` con las
+tablas `repartidores`, `pedidos` (`tipo` y `estado` son `ENUM`) y `entregas` (llaves foráneas
+a las otras dos). Ejecútalo, y deja en [`src/dao/ConexionDB.java`](src/dao/ConexionDB.java) tu
+contraseña de MySQL (ver "Configuración de MySQL" más abajo; el conector ya está en `lib/`).
+
+**Capa `dao`** — `RepartidorDAO`, `PedidoDAO` y `EntregaDAO` exponen `create()`, `readAll()`,
+`update()` y `delete()` con `PreparedStatement`/`ResultSet` y `try-with-resources` (cierra
+conexión, statement y resultset aunque haya error). `PedidoDAO.readAll(estado, tipo)` y
+`EntregaDAO.readAll(idPedido, idRepartidor)` aceptan filtros opcionales (`null` = sin filtrar)
+resueltos en SQL con parámetros. Las excepciones `SQLException` suben hasta la vista.
+
+**Capa `Gui`** — `VentanaPrincipal` es un `JFrame` con un `JTabbedPane`; cada pestaña es un
+`JPanel` (`PanelRepartidores`, `PanelPedidos`, `PanelEntregas`) con formulario, `JTable` y
+botones Guardar / Actualizar / Eliminar / Limpiar. Al hacer clic en una fila de la tabla, el
+formulario se llena para editarla. `PanelCrud` concentra lo común: botones → operaciones DAO,
+validación de entradas (campos obligatorios, largo máximo, formato de fecha `AAAA-MM-DD` y hora
+`HH:mm[:ss]`) con mensajes `JOptionPane`, confirmación antes de eliminar, y mensajes claros ante
+errores SQL (incluido el caso de borrar un pedido/repartidor que ya tiene entregas).
+En `PanelEntregas`, pedido y repartidor se eligen en `JComboBox` cargados desde la BD que
+muestran `id - texto` y conservan el id (`Item`); los combos y la tabla se recargan después de
+cada operación y cada vez que se vuelve a esa pestaña, así reflejan altas/ediciones/bajas hechas
+en las otras. Los filtros (pedidos por estado/tipo; entregas por pedido/repartidor) se aplican con
+el botón **Filtrar**.
+
+> Nota: la actividad pide una "ClienteDAO" en el Paso 2, pero el caso y el esquema solo tienen
+> repartidores, pedidos y entregas; se implementó `RepartidorDAO`.
+
+**Verificación**: los tres DAO (CRUD, filtros, fecha/hora, restricciones de llave foránea) y los
+tres paneles (validaciones, selección de fila, combos, filtros, eliminación con confirmación) se
+probaron contra un MySQL 8.4 real con un script de prueba temporal.
+
 ## Semana 7: persistencia con JDBC
 
 Nuevos paquetes `dao` y `modelo`. El objetivo es que los formularios de la semana 6 dejen de
@@ -297,12 +335,8 @@ simulación de consola — pero ya no están conectados a la GUI, que ahora pers
    **File → Project Structure → Libraries → + → Java** y selecciona ese `.jar`.
 4. Ejecuta `main.Main` para abrir la aplicación gráfica.
 
-> No se pudo probar la conexión real a MySQL en el entorno donde se desarrolló este proyecto
-> (no hay un servidor MySQL disponible ahí). Se verificó que el proyecto compila con el
-> conector en el classpath, que la aplicación arranca sin excepciones, y que el manejo de
-> errores de conexión funciona correctamente (ver más arriba) — pero se recomienda probar el
-> flujo completo (registrar pedido/repartidor, listar, asignar) con un MySQL real antes de
-> entregar.
+> Desde la semana 8 el esquema usa tablas en plural y los DAO/ventanas de la semana 7 fueron
+> reemplazados (ver arriba); esta sección describe cómo quedó esa semana.
 
 ## Semana 6: interfaz gráfica con Swing
 

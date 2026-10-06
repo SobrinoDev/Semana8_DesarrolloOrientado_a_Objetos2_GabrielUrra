@@ -6,84 +6,62 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
+/** CRUD de la tabla `pedidos`. try-with-resources cierra Connection/Statement/ResultSet. */
 public class PedidoDAO {
 
-    public void guardar(Pedido pedido) throws SQLException {
-        String sql = "INSERT INTO pedido (direccion, tipo, estado) VALUES (?, ?, ?)";
-
-        Connection conexion = null;
-        PreparedStatement statement = null;
-        ResultSet generadas = null;
-        try {
-            conexion = ConexionDB.conectar();
-            statement = conexion.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
-            statement.setString(1, pedido.getDireccion());
-            statement.setString(2, pedido.getTipo());
-            statement.setString(3, pedido.getEstado());
-            statement.executeUpdate();
-
-            generadas = statement.getGeneratedKeys();
-            if (generadas.next()) {
-                pedido.setId(generadas.getInt(1));
-            }
-        } catch (SQLException e) {
-            System.err.println("Error al guardar el pedido: " + e.getMessage());
-            throw e;
-        } finally {
-            ConexionDB.cerrar(generadas, statement, conexion);
+    public void create(Pedido p) throws SQLException {
+        String sql = "INSERT INTO pedidos (direccion, tipo, estado) VALUES (?, ?, ?)";
+        try (Connection c = ConexionDB.conectar(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, p.getDireccion());
+            ps.setString(2, p.getTipo());
+            ps.setString(3, p.getEstado());
+            ps.executeUpdate();
         }
     }
 
-    public List<Pedido> listarTodos() throws SQLException {
-        String sql = "SELECT id, direccion, tipo, estado FROM pedido ORDER BY id";
+    public List<Pedido> readAll() throws SQLException {
+        return readAll(null, null);
+    }
+
+    /** Filtros opcionales: un parámetro null significa "sin filtrar" por ese campo. */
+    public List<Pedido> readAll(String estado, String tipo) throws SQLException {
+        String sql = "SELECT id, direccion, tipo, estado FROM pedidos "
+                + "WHERE (? IS NULL OR estado = ?) AND (? IS NULL OR tipo = ?) ORDER BY id";
         List<Pedido> pedidos = new ArrayList<>();
-
-        Connection conexion = null;
-        PreparedStatement statement = null;
-        ResultSet resultado = null;
-        try {
-            conexion = ConexionDB.conectar();
-            statement = conexion.prepareStatement(sql);
-            resultado = statement.executeQuery();
-
-            while (resultado.next()) {
-                pedidos.add(new Pedido(
-                        resultado.getInt("id"),
-                        resultado.getString("direccion"),
-                        resultado.getString("tipo"),
-                        resultado.getString("estado")
-                ));
+        try (Connection c = ConexionDB.conectar(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, estado);
+            ps.setString(2, estado);
+            ps.setString(3, tipo);
+            ps.setString(4, tipo);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    pedidos.add(new Pedido(rs.getInt("id"), rs.getString("direccion"),
+                            rs.getString("tipo"), rs.getString("estado")));
+                }
             }
-        } catch (SQLException e) {
-            System.err.println("Error al listar los pedidos: " + e.getMessage());
-            throw e;
-        } finally {
-            ConexionDB.cerrar(resultado, statement, conexion);
         }
-
         return pedidos;
     }
 
-    public void actualizarEstado(int idPedido, String nuevoEstado) throws SQLException {
-        String sql = "UPDATE pedido SET estado = ? WHERE id = ?";
+    public void update(Pedido p) throws SQLException {
+        String sql = "UPDATE pedidos SET direccion = ?, tipo = ?, estado = ? WHERE id = ?";
+        try (Connection c = ConexionDB.conectar(); PreparedStatement ps = c.prepareStatement(sql)) {
+            ps.setString(1, p.getDireccion());
+            ps.setString(2, p.getTipo());
+            ps.setString(3, p.getEstado());
+            ps.setInt(4, p.getId());
+            ps.executeUpdate();
+        }
+    }
 
-        Connection conexion = null;
-        PreparedStatement statement = null;
-        try {
-            conexion = ConexionDB.conectar();
-            statement = conexion.prepareStatement(sql);
-            statement.setString(1, nuevoEstado);
-            statement.setInt(2, idPedido);
-            statement.executeUpdate();
-        } catch (SQLException e) {
-            System.err.println("Error al actualizar el estado del pedido: " + e.getMessage());
-            throw e;
-        } finally {
-            ConexionDB.cerrar(statement, conexion);
+    public void delete(int id) throws SQLException {
+        try (Connection c = ConexionDB.conectar();
+             PreparedStatement ps = c.prepareStatement("DELETE FROM pedidos WHERE id = ?")) {
+            ps.setInt(1, id);
+            ps.executeUpdate();
         }
     }
 }
